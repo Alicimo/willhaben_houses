@@ -1,0 +1,57 @@
+---
+title: "Rearranging top30 using similarities"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+  pdf_document: default
+---
+
+```{r}
+library(ggplot2)
+library(data.table)
+library(ggthemes)
+library(glmnetUtils)
+library(ggrepel)
+
+script.dir <- getwd()
+project.dir <- dirname(script.dir)
+data.dir <- paste0(project.dir,'/data')
+src.dir <- paste0(project.dir,'/src')
+
+source(paste0(src.dir,'/houses.process.R'))
+dt <- get.houses(data.dir)
+
+dt <- dt[!is.na(price)]
+dt <- dt[price!=15E6]
+dt <- dt[price>1E4]
+dt <- dt[V1!=378588454]
+```
+
+```{r}
+ignored <- c('V1','location','gesamtflache','nutzflache','fgee','hwb.energieklasse','fgee.energieklasse','zimmer',"betriebskosten.inkl.mwst","heizkosten.exkl.mwst", "monatliche.kosten.mwst", "monatliche.kosten.inkl.mwst", "sonstige.kosten.exkl.mwst",'geometry','country','state','county','houseNumber','address','street','district','city','live')
+
+x <- dt[,.SD,.SDcols=names(dt)[!(names(dt) %in% c(ignored))]]
+plot(m <- cv.glmnet(log(price) ~ ., data=x))
+c <- as.matrix(coef(m,s='lambda.min'));c[c!=0,,drop=F]
+
+dt.prices <- cbind(dt, price.predicted = exp(predict(m,x,s=m$lambda.min)[,1]))
+dt.prices[,residual:=price.predicted - price]
+head(dt.prices <- dt.prices[order(-residual)])
+fwrite(dt.prices, paste0(data.dir,'/houses.modelled.csv'))
+```
+
+```{r}
+dt.prices[postalCode %in% c(2540,2542), .(V1, price, price.predicted, residual, live)]
+dt.prices[price>5E5 & price<6E5][,.(V1, price, price.predicted, residual, live)]
+```
+
+
+```{r}
+y <- c[grep('postalCode',rownames(c)),]
+y <- data.table(postalCode=gsub('postalCode','',names(y)),y)
+y <- y[dt.prices[,mean(wien.dist + kottingbrunn.dist),postalCode],on='postalCode']
+ggplot(y) + aes(x=V1,y=y,label=postalCode) + geom_point() + geom_label_repel() + xlim(25E3,35E3)
+y <- y[,.SD[(V1 <= .SD[postalCode==2540]$V1) & y <= 0]][order(V1)]
+dt[,.N,.(postalCode,city)][order(N),city[1],postalCode][y, on='postalCode'][order(i.V1)]
+```
