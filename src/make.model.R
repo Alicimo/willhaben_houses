@@ -1,0 +1,10 @@
+library(git2r)
+project.dir <- workdir(repository())
+data.dir <- paste0(project.dir,'/data')
+src.dir <- paste0(project.dir,'/src')
+
+source(paste0(src.dir,'/utils.R'))
+dt <- get.houses(data.dir)
+dt <- remove.outliers(dt)
+dt <- houses.lasso(dt, verbose = F)
+fwrite(dt, paste0(data.dir,'/houses.modelled.csv'))

@@ -1,5 +1,5 @@
 ---
-title: "Rearranging top30 using similarities"
+title: "House price predictions"
 output:
   html_document:
     code_folding: hide
@@ -21,23 +21,11 @@ src.dir <- paste0(project.dir,'/src')
 
 source(paste0(src.dir,'/houses.process.R'))
 dt <- get.houses(data.dir)
-
-dt <- dt[!is.na(price)]
-dt <- dt[price!=15E6]
-dt <- dt[price>1E4]
-dt <- dt[V1!=378588454]
+dt <- remove.outliers(dt)
 ```
 
 ```{r}
-ignored <- c('V1','location','gesamtflache','nutzflache','fgee','hwb.energieklasse','fgee.energieklasse','zimmer',"betriebskosten.inkl.mwst","heizkosten.exkl.mwst", "monatliche.kosten.mwst", "monatliche.kosten.inkl.mwst", "sonstige.kosten.exkl.mwst",'geometry','country','state','county','houseNumber','address','street','district','city','live')
-
-x <- dt[,.SD,.SDcols=names(dt)[!(names(dt) %in% c(ignored))]]
-plot(m <- cv.glmnet(log(price) ~ ., data=x))
-c <- as.matrix(coef(m,s='lambda.min'));c[c!=0,,drop=F]
-
-dt.prices <- cbind(dt, price.predicted = exp(predict(m,x,s=m$lambda.min)[,1]))
-dt.prices[,residual:=price.predicted - price]
-head(dt.prices <- dt.prices[order(-residual)])
+head(dt.prices <- houses.lasso(dt))
 fwrite(dt.prices, paste0(data.dir,'/houses.modelled.csv'))
 ```
 
